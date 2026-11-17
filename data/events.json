@@ -1,0 +1,33 @@
+{
+  "_説明": "building は data/buildings.json の name と一致させる。屋外の企画は building を省略して lat,lon を指定。verify:true は位置が未確定の項目。",
+  "pois": [
+    { "id": "kougi", "name": "講義棟", "building": "講義棟",
+      "events": [ { "title": "PMC LIVE", "desc": "D講義室", "time": "両日 10:00〜16:00" } ] },
+    { "id": "sougou", "name": "総合研究棟", "building": "総合研究棟",
+      "events": [ { "title": "お化け屋敷", "desc": "2F廊下 ※整理券が必要（先着順）", "time": "両日 10:00〜16:00" } ] },
+    { "id": "busshitsu1", "name": "物質・材料 経営情報1号棟", "building": "物質・材料 経営情報一号棟",
+      "events": [ { "title": "F4 てくのみゅーじあむ", "desc": "" } ] },
+    { "id": "library", "name": "図書館棟", "building": "図書館",
+      "events": [ { "title": "F2 ポケモンカード体験会", "desc": "" }, { "title": "F3 技大deらぼ", "desc": "" } ] },
+    { "id": "fukuri", "name": "福利棟", "building": "福利棟",
+      "events": [ { "title": "F5 フリーマーケット", "desc": "" } ] },
+    { "id": "multimedia", "name": "マルチメディアシステムセンター", "building": "マルチメディアシステムセンター",
+      "events": [ { "title": "ゲーム大会", "desc": "", "time": "9/20 10:00〜16:00" } ] },
+    { "id": "kikai1", "name": "機械・建設1号棟", "building": "機械・建設一号棟",
+      "events": [ { "title": "F7 おりがみ工房", "desc": "" }, { "title": "F8 ライフステージ体験", "desc": "" } ] },
+    { "id": "okugai", "name": "屋外エリア", "lat": 37.42526, "lon": 138.77893,
+      "events": [ { "title": "模擬店", "desc": "講義棟前から機械・建設1号棟前までの通路" } ] },
+    { "id": "stage", "name": "ステージ・受付", "lat": 37.424017, "lon": 138.77854, "verify": true,
+      "events": [ { "title": "ステージ", "desc": "生物棟の東側" }, { "title": "受付・案内所", "desc": "" } ] },
+    { "id": "kitchen", "name": "キッチンカーエリア", "lat": 37.423634, "lon": 138.778959, "verify": true,
+      "events": [ { "title": "キッチンカー", "desc": "タピジャン / Happy Berry / PANDACAFE / 鳥道場とりしず / Relucks / タコスの森" } ] },
+    { "id": "parking", "name": "中央駐車場", "lat": 37.42383, "lon": 138.77875, "verify": true,
+      "events": [ { "title": "キッキングスナイパー", "desc": "", "time": "両日 12:00〜14:00" },
+                  { "title": "縁日", "desc": "", "time": "両日 10:00〜16:00" },
+                  { "title": "ユニオンツール", "desc": "" } ] },
+    { "id": "f6", "name": "F6 会場", "lat": 37.424797, "lon": 138.777972, "verify": true,
+      "events": [ { "title": "F6 全身放射能測定", "desc": "" } ] },
+    { "id": "f9f10", "name": "セコムホール北側", "lat": 37.422718, "lon": 138.779361, "verify": true,
+      "events": [ { "title": "F9 ロボコンプロジェクト", "desc": "" }, { "title": "F10 ドローン操縦体験", "desc": "" } ] }
+  ]
+}

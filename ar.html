@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>技大祭 ARガイド</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --accent: #e6007e; --ink: #14213d; --panel: rgba(20, 33, 61, .86); }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #0b1020; color: #fff; overflow: hidden; overscroll-behavior: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+
+  #start { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; justify-content: center; gap: 14px;
+    padding: 28px 22px; background: linear-gradient(160deg, #2b3a8f, #0b1020 70%); }
+  #start h1 { margin: 0; font-size: 28px; letter-spacing: .04em; }
+  #start p { margin: 0; font-size: 14px; line-height: 1.8; opacity: .92; }
+  #go { margin-top: 8px; padding: 16px; border-radius: 14px; background: var(--accent); font-size: 17px; font-weight: 700; }
+  #start a { color: #fff; font-size: 12px; opacity: .7; }
+  #start .note { font-size: 12px; opacity: .7; }
+  #start .destin { padding: 10px 14px; border-radius: 12px; background: rgba(255, 180, 0, .18); border: 1px solid #ffb400; font-size: 14px; line-height: 1.6; }
+  #start .destin[hidden] { display: none; }
+
+  #video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #1a2238; }
+  #overlay { position: fixed; inset: 0; overflow: hidden; touch-action: none; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px; border: 2px solid rgba(255, 255, 255, .8);
+    border-radius: 50%; box-shadow: 0 0 4px rgba(0, 0, 0, .6); pointer-events: none; }
+  #cross::after { content: ""; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: #fff; }
+
+  .label { position: absolute; left: 0; top: 0; transform-origin: 50% 100%; will-change: transform; display: none;
+    min-width: 120px; max-width: 220px; padding: 7px 11px 8px; border-radius: 12px; border: 2px solid var(--accent);
+    background: rgba(255, 255, 255, .94); color: var(--ink); text-align: left; box-shadow: 0 2px 8px rgba(0, 0, 0, .35); }
+  .label::after { content: ""; position: absolute; left: 50%; bottom: -9px; margin-left: -8px; border: 8px solid transparent;
+    border-top-color: var(--accent); border-bottom: 0; }
+  .label .n { font-size: 10px; font-weight: 600; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .label .t { font-size: 14px; font-weight: 800; line-height: 1.3; }
+  .label .m { font-size: 10px; color: #445; margin-top: 1px; }
+  .label.far { opacity: .62; border-style: dashed; }
+  .label.dest { border-color: #ffb400; box-shadow: 0 0 0 3px rgba(255, 180, 0, .6), 0 2px 8px rgba(0, 0, 0, .35); }
+  .label.dest::after { border-top-color: #ffb400; }
+
+  #top { position: fixed; left: 0; right: 0; top: 0; z-index: 5; padding: calc(8px + env(safe-area-inset-top)) 10px 18px;
+    background: linear-gradient(rgba(0, 0, 0, .6), transparent); pointer-events: none; font-size: 12px; text-shadow: 0 1px 3px #000; }
+  #sensor { max-width: calc(100% - 140px); line-height: 1.6; }
+  #warn { display: none; margin-top: 4px; padding: 5px 9px; border-radius: 8px; background: rgba(200, 60, 0, .85); max-width: calc(100% - 140px); }
+  #fix { display: none; pointer-events: auto; margin-top: 6px; padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, .25); font-size: 11px; }
+  #map { position: fixed; right: 10px; top: calc(10px + env(safe-area-inset-top)); z-index: 6; width: 120px; height: 120px;
+    border-radius: 50%; border: 2px solid rgba(255, 255, 255, .7); background: rgba(11, 16, 32, .7); }
+
+  #guide { position: fixed; left: 50%; top: calc(140px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 6; display: none;
+    align-items: center; gap: 10px; padding: 8px 12px 8px 10px; border-radius: 999px; background: #ffb400; color: #221a00; font-weight: 700;
+    font-size: 14px; max-width: 92%; white-space: nowrap; }
+  #arrow { width: 26px; height: 26px; flex: none; }
+  #gtext { overflow: hidden; text-overflow: ellipsis; }
+  #gstop { flex: none; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .2); color: #221a00; font-size: 13px; line-height: 24px; padding: 0; }
+
+  #bottom { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 20px 10px calc(10px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, rgba(0, 0, 0, .7) 35%); display: flex; gap: 8px; align-items: flex-end; }
+  #front { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--panel); text-align: left; }
+  #front .b { font-size: 11px; opacity: .8; }
+  #front .t { font-size: 16px; font-weight: 700; margin-top: 1px; }
+  #front .e { font-size: 13px; line-height: 1.5; margin-top: 3px; }
+  #front .e b { color: #ffd1ea; }
+  #listbtn { flex: none; padding: 12px 14px; border-radius: 12px; background: var(--accent); font-weight: 700; font-size: 14px; }
+
+  #sheet { position: fixed; inset: 0; z-index: 30; display: none; background: rgba(0, 0, 0, .5); }
+  #sheetin { position: absolute; left: 0; right: 0; bottom: 0; max-height: 78%; overflow-y: auto; border-radius: 18px 18px 0 0;
+    background: #fff; color: var(--ink); padding: 16px 14px calc(18px + env(safe-area-inset-bottom)); }
+  #sheetin h2 { margin: 0 0 10px; font-size: 17px; }
+  .row { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 11px 4px; background: none;
+    border-top: 1px solid #e3e6ee; color: var(--ink); }
+  .row .x { flex: 1; min-width: 0; }
+  .row .p { font-size: 11px; color: var(--accent); font-weight: 600; }
+  .row .q { font-size: 15px; font-weight: 700; line-height: 1.4; }
+  .row .r { font-size: 12px; color: #556; line-height: 1.5; }
+  .row .d { flex: none; font-size: 12px; color: #556; }
+  .nav { display: block; width: 100%; margin-top: 12px; padding: 14px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 700; font-size: 15px; }
+  .ghost { background: #eef0f6; color: var(--ink); }
+</style>
+</head>
+<body>
+
+<video id="video" autoplay muted playsinline></video>
+<div id="overlay"><div id="cross"></div></div>
+<div id="top">
+  <div id="sensor">現在地を確認中…</div>
+  <div id="warn"></div>
+  <button id="fix"></button>
+</div>
+<canvas id="map" width="240" height="240"></canvas>
+<div id="guide">
+  <svg id="arrow" viewBox="0 0 24 24"><path d="M12 2l7 18-7-4-7 4z" fill="#221a00"/></svg>
+  <span id="gtext"></span>
+  <button id="gstop" aria-label="案内を終了">✕</button>
+</div>
+<div id="bottom">
+  <button id="front"><div class="b">正面</div><div class="t">周囲の建物へカメラを向けてください</div><div class="e"></div></button>
+  <button id="listbtn">企画一覧</button>
+</div>
+<div id="sheet"><div id="sheetin"></div></div>
+
+<section id="start">
+  <h1>技大祭 ARガイド</h1>
+  <p>カメラを周囲へ向けると、企画の開催場所が方向と距離で表示されます。会場の全域で利用可能です。</p>
+  <p class="destin" id="destin" hidden></p>
+  <button id="go">カメラを起動</button>
+  <p class="note">カメラ・位置情報・方位センサーの利用許可が必要です。映像と位置は端末内で処理し、送信しません。</p>
+</section>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const RAD = Math.PI / 180;
+const LONG_FOV = Number(params.get('fov')) || 65;   // カメラ映像の長辺方向の画角（度）
+const NEAR = 20;                                    // この距離（m）未満は「現在地付近」として処理
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+// ---------- データ ----------
+const [bData, eData] = await Promise.all(['data/buildings.json', 'data/events.json'].map((u) => fetch(u).then((r) => r.json())));
+const ORIGIN = { lat: 37.4252, lon: 138.7788 };
+const MX = 111320 * Math.cos(ORIGIN.lat * RAD), MY = 110540;
+const toXY = (lat, lon) => [(lon - ORIGIN.lon) * MX, (lat - ORIGIN.lat) * MY]; // 東が +x、北が +y（m）
+
+const buildings = bData.buildings.map((b) => ({ ...b, pts: b.ring.map(([la, lo]) => toXY(la, lo)), xy: toXY(b.lat, b.lon), poi: null }));
+const pois = eData.pois.map((p) => {
+  const b = p.building ? buildings.find((x) => x.name === p.building) : null;
+  const poi = { ...p, b, xy: b ? b.xy : toXY(p.lat, p.lon) };
+  if (b) b.poi = poi;
+  return poi;
+});
+
+// ---------- 状態 ----------
+const state = {
+  pos: null, acc: null,            // 現在地（m 座標）と誤差
+  hx: 0, hy: 1, pitch: 0,          // 平滑化済みの方位ベクトルと仰角（度）
+  hasHeading: false,
+  offset: Number(store.get('headingOffset')) || 0, // 利用者による方位補正（度）
+  dest: null, destEv: 0, front: null, f: 600,
+};
+window.__geo = state; // 動作確認用
+const heading = () => (Math.atan2(state.hx, state.hy) / RAD + state.offset + 360) % 360;
+const wrap = (a) => ((a + 540) % 360) - 180;
+
+// ---------- 幾何 ----------
+// 現在地 o から方向 (dx,dy) へのレイが最初に交差する建物と距離を返す
+function castRay(o, dx, dy, maxT) {
+  let best = null, bt = maxT;
+  for (const b of buildings) {
+    const n = b.pts.length;
+    for (let i = 0; i < n; i++) {
+      const [x1, y1] = b.pts[i], [x2, y2] = b.pts[(i + 1) % n];
+      const ex = x2 - x1, ey = y2 - y1, den = dx * ey - dy * ex;
+      if (Math.abs(den) < 1e-9) continue;
+      const t = ((x1 - o[0]) * ey - (y1 - o[1]) * ex) / den;
+      const u = ((x1 - o[0]) * dy - (y1 - o[1]) * dx) / den;
+      if (t > 0.5 && t < bt && u >= 0 && u <= 1) { bt = t; best = b; }
+    }
+  }
+  return best ? { b: best, t: bt } : null;
+}
+
+function poiInfo(p) {
+  const a = p.anchor || p.xy; // 建物は可視部分の中心、屋外企画は登録座標
+  const dx = a[0] - state.pos[0], dy = a[1] - state.pos[1];
+  const d = Math.hypot(dx, dy);
+  return { d, bearing: (Math.atan2(dx, dy) / RAD + 360) % 360, dx: dx / (d || 1), dy: dy / (d || 1) };
+}
+// 可視判定: 建物は輪郭の各頂点へレイを発射し、到達した頂点の平均をラベルの基準点とする
+function updateVisibility(p) {
+  const targets = p.b ? p.b.pts : [p.xy];
+  const seen = [];
+  let sx = 0, sy = 0;
+  for (const [x, y] of targets) {
+    const dx = x - state.pos[0], dy = y - state.pos[1], d = Math.hypot(dx, dy);
+    if (d < 1) continue;
+    const hit = castRay(state.pos, dx / d, dy / d, d - 1.5);
+    if (!hit || hit.b === p.b) { sx += x; sy += y; seen.push([Math.atan2(dx, dy) / RAD, d]); }
+  }
+  const n = seen.length;
+  p.occluded = n === 0;
+  p.anchor = n ? [sx / n, sy / n] : null;
+  // 可視部分の方位幅（基準点からの相対角）と最短距離。ラベルを可視範囲内で画面中央へ寄せる用途
+  p.span = [0, 0]; p.nearD = null;
+  if (n && p.b) {
+    const base = poiInfo(p).bearing, offs = seen.map(([b]) => wrap(b - base));
+    p.span = [Math.min(...offs), Math.max(...offs)];
+    p.nearD = Math.min(...seen.map(([, d]) => d));
+  }
+}
+const fmtD = (d) => (d < 1000 ? `${Math.round(d / 5) * 5}m` : `${(d / 1000).toFixed(1)}km`);
+
+// ---------- ラベル ----------
+const overlay = $('overlay');
+for (const p of pois) {
+  const el = document.createElement('button');
+  el.className = 'label';
+  el.innerHTML = '<div class="n"></div><div class="t"></div><div class="m"></div>';
+  el.querySelector('.n').textContent = p.name;
+  el.querySelector('.t').textContent = p.events[0].title + (p.events.length > 1 ? ` 他${p.events.length - 1}件` : '');
+  el.onclick = (ev) => { ev.stopPropagation(); openPoi(p); };
+  overlay.appendChild(el);
+  p.el = el; p.meta = el.querySelector('.m');
+}
+
+function updateFocal() {
+  const v = $('video'), W = innerWidth, H = innerHeight;
+  const vw = v.videoWidth || W, vh = v.videoHeight || H;
+  const long = Math.max(vw, vh) * Math.max(W / vw, H / vh);
+  state.f = long / 2 / Math.tan(LONG_FOV / 2 * RAD);
+}
+addEventListener('resize', updateFocal);
+
+let occTick = 0;
+function frame() {
+  requestAnimationFrame(frame);
+  if (!state.pos) return;
+  const W = innerWidth, H = innerHeight, f = state.f, hd = heading();
+  const top = 150, bottom = H - 130;
+  const refreshOcc = occTick++ % 15 === 0; // 遮蔽判定と正面判定は負荷軽減のため間引く
+
+  if (refreshOcc) pois.forEach(updateVisibility);
+  const placed = [];
+  let hiddenShown = 0;
+  const list = pois.map((p) => ({ p, ...poiInfo(p) })).sort((a, b) => a.d - b.d);
+  for (const item of list) {
+    const { p, bearing } = item;
+    const d = p.nearD ?? item.d;
+    // 建物が画面を横断する場合、ラベルを可視範囲内で画面中央の最寄りへ配置
+    const c = wrap(bearing - hd), m = Math.min(4, (p.span[1] - p.span[0]) / 2);
+    const dAz = Math.max(c + p.span[0] + m, Math.min(c + p.span[1] - m, 0));
+    const isDest = state.dest === p;
+    // 建物の奥にある企画は、近傍3件（250m 以内）と案内中の目的地のみ表示して混雑を抑制
+    const crowded = p.occluded && !isDest && (d > 250 || hiddenShown >= 3);
+    if ((!p.b && d < NEAR) || Math.abs(dAz) > 62 || crowded) { p.el.style.display = 'none'; continue; }
+    if (p.occluded && !isDest) hiddenShown++;
+    const scale = Math.max(0.72, Math.min(1.08, 1.12 - d / 450));
+    p.el.style.display = 'block';
+    p.el.classList.toggle('far', p.occluded && !isDest);
+    p.el.classList.toggle('dest', isDest);
+    p.meta.textContent = `${fmtD(d)}${p.occluded ? '・建物の奥' : ''}`;
+    const w = p.el.offsetWidth * scale, h = p.el.offsetHeight * scale + 10;
+    const el = Math.max(3, Math.min(28, Math.atan(10 / d) / RAD));
+    const x = W / 2 + f * Math.tan(dAz * RAD);
+    let y = H / 2 - f * Math.tan((el - state.pitch) * RAD);
+    y = Math.max(top + h, Math.min(bottom, y));
+    for (let k = 0; k < 6; k++) { // 重複回避: 近傍のラベルを優先し、遠方を上方へ移動
+      const c = placed.find((r) => Math.abs(r.x - x) < (r.w + w) / 2 + 4 && y > r.y - r.h - 4 && y - h < r.y + 4);
+      if (!c) break;
+      y = c.y - c.h - 6;
+    }
+    placed.push({ x, y, w, h });
+    p.el.style.zIndex = String(1000 - Math.round(d));
+    p.el.style.transform = `translate(${x - p.el.offsetWidth / 2}px, ${y - p.el.offsetHeight - 10}px) scale(${scale})`;
+  }
+
+  if (refreshOcc) updateFront(hd);
+  updateGuide(hd);
+  drawMap(hd);
+}
+
+// ---------- 正面の建物 ----------
+function updateFront(hd) {
+  const hit = castRay(state.pos, Math.sin(hd * RAD), Math.cos(hd * RAD), 300);
+  const near = pois.filter((p) => !p.b && poiInfo(p).d < NEAR);
+  let b = '正面', t, e = '', target = null;
+  if (hit && hit.b.poi) {
+    target = hit.b.poi;
+    b = `正面 ・ ${fmtD(hit.t)}`; t = target.name;
+  } else if (hit && hit.b.name && hit.t < 80) {
+    b = `正面 ・ ${fmtD(hit.t)}`; t = hit.b.name;
+    e = '登録企画なし' + (near.length ? `<br>現在地付近: <b>${esc(near[0].name)}</b>` : '');
+  } else if (near.length) {
+    target = near[0];
+    b = '現在地付近'; t = target.name;
+  } else {
+    t = '周囲の建物へカメラを向けてください';
+  }
+  if (target) e = target.events.map((x) => `<b>${esc(x.title)}</b>${x.time ? ' ' + esc(x.time) : ''}`).join('<br>');
+  const key = b + t + e;
+  if (key !== state.frontKey) {
+    state.frontKey = key; state.front = target;
+    $('front').innerHTML = `<div class="b">${esc(b)}</div><div class="t">${esc(t)}</div><div class="e">${e}</div>`;
+  }
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+$('front').onclick = () => { if (state.front) openPoi(state.front); };
+
+// ---------- 案内 ----------
+function updateGuide(hd) {
+  const g = $('guide');
+  if (!state.dest) { g.style.display = 'none'; return; }
+  const { d: d0, bearing } = poiInfo(state.dest);
+  const d = state.dest.nearD != null ? Math.max(0, state.dest.nearD - 8) : d0; // 建物は外壁までの距離で到着を判定
+  const dAz = wrap(bearing - hd);
+  g.style.display = 'flex';
+  $('arrow').style.transform = `rotate(${d < NEAR ? 0 : dAz}deg)`;
+  const dir = d < NEAR ? '到着' : Math.abs(dAz) < 12 ? '正面' : Math.abs(dAz) > 150 ? '後方' : dAz > 0 ? '右' : '左';
+  $('gtext').textContent = d < NEAR ? `${state.dest.name} 付近に到着` : `${dir} ${fmtD(d)} ・ ${(state.dest.events[state.destEv] || state.dest.events[0]).title}`;
+}
+$('gstop').onclick = () => { state.dest = null; };
+
+// ---------- ミニマップ（進行方向が上） ----------
+const mctx = $('map').getContext('2d');
+function drawMap(hd) {
+  const S = 240, R = 130; // 半径 130m を表示
+  const k = S / 2 / R, c = Math.cos(hd * RAD), s = Math.sin(hd * RAD);
+  const tr = ([x, y]) => {
+    const dx = x - state.pos[0], dy = y - state.pos[1];
+    return [S / 2 + (dx * c - dy * s) * k, S / 2 - (dx * s + dy * c) * k];
+  };
+  mctx.clearRect(0, 0, S, S);
+  mctx.save();
+  mctx.beginPath(); mctx.arc(S / 2, S / 2, S / 2, 0, 7); mctx.clip();
+  // 視野
+  const half = Math.atan(innerWidth / 2 / state.f);
+  mctx.fillStyle = 'rgba(255,255,255,.16)';
+  mctx.beginPath(); mctx.moveTo(S / 2, S / 2); mctx.arc(S / 2, S / 2, S, -Math.PI / 2 - half, -Math.PI / 2 + half); mctx.fill();
+  for (const b of buildings) {
+    if (Math.hypot(b.xy[0] - state.pos[0], b.xy[1] - state.pos[1]) > R + 80) continue;
+    mctx.beginPath();
+    b.pts.forEach((p, i) => { const [x, y] = tr(p); i ? mctx.lineTo(x, y) : mctx.moveTo(x, y); });
+    mctx.closePath();
+    mctx.fillStyle = b.poi ? (b.poi === state.dest ? '#ffb400' : '#e6007e') : 'rgba(170,180,210,.75)';
+    mctx.fill();
+  }
+  for (const p of pois) {
+    if (p.b) continue;
+    const [x, y] = tr(p.xy);
+    mctx.fillStyle = p === state.dest ? '#ffb400' : '#e6007e';
+    mctx.beginPath(); mctx.arc(x, y, 7, 0, 7); mctx.fill();
+  }
+  if (state.dest) {
+    const [x, y] = tr(state.dest.xy);
+    mctx.strokeStyle = '#ffb400'; mctx.lineWidth = 4; mctx.setLineDash([8, 6]);
+    mctx.beginPath(); mctx.moveTo(S / 2, S / 2); mctx.lineTo(x, y); mctx.stroke(); mctx.setLineDash([]);
+  }
+  mctx.restore();
+  mctx.fillStyle = '#fff'; mctx.strokeStyle = '#14213d'; mctx.lineWidth = 2;
+  mctx.beginPath(); mctx.moveTo(S / 2, S / 2 - 14); mctx.lineTo(S / 2 + 10, S / 2 + 10); mctx.lineTo(S / 2 - 10, S / 2 + 10); mctx.closePath();
+  mctx.fill(); mctx.stroke();
+}
+
+// ---------- 一覧・詳細 ----------
+const sheet = $('sheet'), sheetIn = $('sheetin');
+sheet.onclick = (e) => { if (e.target === sheet) sheet.style.display = 'none'; };
+function openList() {
+  sheetIn.innerHTML = '<h2>企画一覧（近接順）</h2>';
+  const list = pois.map((p) => ({ p, d: state.pos ? poiInfo(p).d : null })).sort((a, b) => (a.d ?? 0) - (b.d ?? 0));
+  for (const { p, d } of list) for (const ev of p.events) {
+    const r = document.createElement('button');
+    r.className = 'row';
+    r.innerHTML = `<div class="x"><div class="p">${esc(p.name)}</div><div class="q">${esc(ev.title)}</div><div class="r">${esc([ev.desc, ev.time].filter(Boolean).join(' ／ '))}</div></div><div class="d">${d == null ? '' : fmtD(d)}</div>`;
+    r.onclick = () => openPoi(p);
+    sheetIn.appendChild(r);
+  }
+  sheet.style.display = 'block';
+}
+function openPoi(p) {
+  const d = state.pos ? fmtD(poiInfo(p).d) : '';
+  sheetIn.innerHTML = `<h2>${esc(p.name)}　<small style="font-weight:400;color:#556">${d}</small></h2>` +
+    p.events.map((ev) => `<div class="row"><div class="x"><div class="q">${esc(ev.title)}</div><div class="r">${esc([ev.desc, ev.time].filter(Boolean).join(' ／ '))}</div></div></div>`).join('') +
+    (p.verify ? '<div class="r" style="font-size:11px;color:#889;margin-top:6px">※位置は概略</div>' : '');
+  const nav = document.createElement('button');
+  nav.className = 'nav'; nav.textContent = 'この場所へ案内';
+  nav.onclick = () => { state.dest = p; state.destEv = 0; sheet.style.display = 'none'; };
+  const back = document.createElement('button');
+  back.className = 'nav ghost'; back.textContent = '一覧を表示';
+  back.onclick = openList;
+  sheetIn.append(nav, back);
+  sheet.style.display = 'block';
+}
+$('listbtn').onclick = openList;
+
+// ---------- 方位補正（左右ドラッグ） ----------
+let drag = null;
+overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) drag = { x: e.clientX, base: state.offset, moved: false }; });
+overlay.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x;
+  if (!drag.moved && Math.abs(dx) < 12) return;
+  drag.moved = true;
+  state.offset = wrap(drag.base - Math.atan(dx / state.f) / RAD);
+  showFix();
+});
+const endDrag = () => { if (drag?.moved) store.set('headingOffset', String(state.offset)); drag = null; };
+overlay.addEventListener('pointerup', endDrag);
+overlay.addEventListener('pointercancel', endDrag);
+function showFix() {
+  const o = Math.round(state.offset);
+  $('fix').style.display = o ? 'inline-block' : 'none';
+  $('fix').textContent = `方位補正 ${o > 0 ? '+' : ''}${o}° ✕解除`;
+}
+$('fix').onclick = () => { state.offset = 0; store.set('headingOffset', '0'); showFix(); };
+showFix();
+
+// ---------- センサー ----------
+function setHeading(deg, pitch, k = 0.25) {
+  const x = Math.sin(deg * RAD), y = Math.cos(deg * RAD);
+  if (!state.hasHeading) { state.hx = x; state.hy = y; state.pitch = pitch; state.hasHeading = true; }
+  state.hx += (x - state.hx) * k; state.hy += (y - state.hy) * k; state.pitch += (pitch - state.pitch) * k;
+}
+function onOrientation(e) {
+  if (e.webkitCompassHeading != null) { // iOS: 傾斜補正済みの方位
+    setHeading(e.webkitCompassHeading, (e.beta ?? 90) - 90);
+    return;
+  }
+  if (e.alpha == null || !(e.absolute || e.type === 'deviceorientationabsolute')) return;
+  // 端末の回転行列から背面カメラの視線方向を算出（端末を直立させた状態でも安定）
+  const a = e.alpha * RAD, b = e.beta * RAD, g = e.gamma * RAD;
+  const east = -(Math.cos(a) * Math.sin(g) + Math.sin(a) * Math.sin(b) * Math.cos(g));
+  const north = -(Math.sin(a) * Math.sin(g) - Math.cos(a) * Math.sin(b) * Math.cos(g));
+  const up = -Math.cos(b) * Math.cos(g);
+  if (Math.hypot(east, north) < 0.15) return; // 真上・真下では方位が不定
+  setHeading(Math.atan2(east, north) / RAD, Math.asin(Math.max(-1, Math.min(1, up))) / RAD);
+}
+function status() {
+  const parts = [];
+  parts.push(state.pos ? `位置誤差 ±${Math.round(state.acc)}m` : '現在地を確認中…');
+  parts.push(state.hasHeading ? `方位 ${Math.round(heading())}°` : '方位センサー未検出（左右ドラッグで回転）');
+  $('sensor').textContent = parts.join(' ／ ');
+  const w = $('warn');
+  let msg = state.noCam ? 'カメラを起動不可（方向表示のみ動作）' : '';
+  if (state.pos && Math.hypot(...state.pos) > 900) msg = '会場から離隔した位置です。方向と距離のみ表示します。';
+  else if (state.acc > 25) msg = '位置の誤差が大。屋外の開放的な場所で精度が向上します。';
+  w.style.display = msg ? 'block' : 'none'; w.textContent = msg;
+}
+setInterval(status, 500);
+
+async function start() {
+  $('start').style.display = 'none';
+  const sim = params.get('sim'); // 検証用: ?sim=緯度,経度,方位
+  if (sim) {
+    const [la, lo, h] = sim.split(',').map(Number);
+    state.pos = toXY(la, lo); state.acc = 5;
+    if (!Number.isNaN(h)) { setHeading(h, 0, 1); }
+  } else {
+    // iOS は利用者の操作を起点とする許可要求が必須
+    try {
+      if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission();
+    } catch (e) { console.warn(e); }
+    addEventListener('ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation', onOrientation);
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(
+        (p) => {
+          const xy = toXY(p.coords.latitude, p.coords.longitude);
+          // 測位の跳躍を抑制する軽度の平滑化
+          state.pos = state.pos ? [state.pos[0] + (xy[0] - state.pos[0]) * 0.5, state.pos[1] + (xy[1] - state.pos[1]) * 0.5] : xy;
+          state.acc = p.coords.accuracy;
+        },
+        () => { $('sensor').textContent = '位置情報を取得不可。ブラウザの設定で許可してください。'; },
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 },
+      );
+    }
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+    const v = $('video');
+    v.srcObject = stream;
+    v.addEventListener('loadedmetadata', updateFocal);
+  } catch (e) {
+    console.warn(e);
+    state.noCam = true;
+  }
+  updateFocal();
+  requestAnimationFrame(frame);
+}
+// 地図画面（NAsVI マップ）から渡された目的地: ?dest=<events.json の id>&ev=<企画の番号>
+{
+  const p = pois.find((x) => x.id === params.get('dest'));
+  if (p) {
+    state.dest = p;
+    state.destEv = Math.min(p.events.length - 1, Math.max(0, Number(params.get('ev')) || 0));
+    $('destin').textContent = `目的地：${p.events[state.destEv].title}（${p.name}）。起動後、方向と距離で案内します。`;
+    $('destin').hidden = false;
+  }
+}
+$('go').onclick = start;
+if (params.get('sim')) start();
+</script>
+</body>
+</html>

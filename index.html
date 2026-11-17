@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#130a22">
+<title>NAsVI マップ</title>
+<style>
+  :root {
+    --bg: #130a22;
+    --panel: rgba(28, 16, 50, 0.9);
+    --panel-solid: #1c1032;
+    --line: rgba(167, 139, 250, 0.2);
+    --violet: #6d28d9;
+    --lilac: #a78bfa;
+    --leaf: #10b981;
+    --mint: #5eead4;
+    --yel: #ffd84a;
+    --ink: #1e0b3a;
+    --text: #f4f0ff;
+    --sub: #b4a9cf;
+    --jp: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    --en: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    display: grid; place-items: center;
+    background: #0b0614; color: var(--text);
+    font-family: var(--jp); -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+  /* 端末の枠（PC での表示時のみ） */
+  .app {
+    position: relative; width: 100%; height: 100dvh;
+    display: flex; flex-direction: column;
+    background: var(--bg); overflow: hidden;
+  }
+  @media (min-width: 600px) {
+    .app { width: 390px; height: min(844px, calc(100dvh - 40px)); border-radius: 46px; border: 10px solid #000; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55); }
+  }
+
+  .stage { position: relative; flex: 1; min-height: 0; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+
+  /* ---------- 上部: 検索窓 ---------- */
+  .top {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 7;
+    padding: calc(env(safe-area-inset-top) + 14px) 16px 0;
+  }
+  .search {
+    display: flex; align-items: center; gap: 10px;
+    height: 48px; padding: 0 8px 0 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  .search:focus-within { border-color: var(--lilac); }
+  .search svg { flex: none; color: var(--sub); }
+  .search input {
+    flex: 1; min-width: 0; height: 100%;
+    background: none; border: 0; outline: 0;
+    color: var(--text); font: 500 16px var(--jp);
+  }
+  .search input::placeholder { color: #8d82aa; }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .clear { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; color: var(--sub); }
+  .clear[hidden] { display: none; }
+
+  .results {
+    list-style: none; margin-top: 8px; max-height: 52vh; overflow-y: auto;
+    background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px;
+  }
+  .results[hidden] { display: none; }
+  .results li + li { border-top: 1px solid var(--line); }
+  .row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; text-align: left; }
+  .row:active { background: rgba(167, 139, 250, 0.1); }
+  .row .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--leaf); }
+  .row .dot.out { background: var(--mint); }
+  .row .t { display: block; font-size: 15px; font-weight: 700; line-height: 1.35; }
+  .row .s { display: block; margin-top: 2px; font-size: 12px; color: var(--sub); line-height: 1.4; }
+  .row .m { margin-left: auto; flex: none; font: 600 12px var(--en); color: var(--sub); }
+  .empty { padding: 16px; font-size: 13px; color: var(--sub); }
+
+  /* ---------- 地図の操作ボタン ---------- */
+  .ctrl { position: absolute; right: 16px; z-index: 4; display: flex; flex-direction: column; gap: 8px; transition: bottom 0.25s; }
+  .ctrl button {
+    width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+    background: var(--panel); border: 1px solid var(--line);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  #compass svg { transition: none; }
+
+  /* ---------- 目的地カード ---------- */
+  .card {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 4;
+    padding: 14px 14px 12px 16px;
+    background: var(--panel-solid); border: 1px solid var(--line); border-radius: 18px;
+    transform: translateY(0); transition: transform 0.28s cubic-bezier(.2, .8, .2, 1), opacity 0.2s;
+  }
+  .card.off { transform: translateY(calc(100% + 24px)); opacity: 0; pointer-events: none; }
+  .card .head { display: flex; align-items: flex-start; gap: 12px; }
+  .card .info { flex: 1; min-width: 0; }
+  .card .place { font-size: 12px; color: var(--mint); font-weight: 600; }
+  .card h2 { margin-top: 2px; font-size: 18px; font-weight: 800; line-height: 1.35; }
+  .card .desc { margin-top: 4px; font-size: 13px; color: var(--sub); line-height: 1.45; }
+  .card .dist { flex: none; text-align: right; padding-top: 2px; }
+  .card .dist b { font: 700 24px var(--en); }
+  .card .dist b small { font-size: 13px; font-weight: 600; margin-left: 2px; }
+  .card .dist span { display: block; font-size: 12px; color: var(--sub); }
+  .card .act { display: flex; gap: 8px; margin-top: 12px; }
+  .card .go {
+    flex: 1; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--yel); color: var(--ink); font-size: 15px; font-weight: 800; text-decoration: none;
+  }
+  .card .close { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; border: 1px solid var(--line); color: var(--sub); }
+
+  /* ---------- 企画一覧（左タブ） ---------- */
+  .list {
+    position: absolute; inset: 0; z-index: 6; overflow-y: auto;
+    padding: calc(env(safe-area-inset-top) + 78px) 16px 24px;
+    background: var(--bg);
+  }
+  .list[hidden] { display: none; }
+  .list h3 { margin: 18px 4px 8px; font-size: 12px; font-weight: 700; color: var(--sub); letter-spacing: 0.04em; }
+  .list h3:first-child { margin-top: 4px; }
+  .list ul { list-style: none; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .list li + li { border-top: 1px solid var(--line); }
+
+  /* ---------- 下部: タブバー ---------- */
+  .tabs {
+    position: relative; z-index: 6; flex: none;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    padding: 6px 12px calc(env(safe-area-inset-bottom) + 8px);
+    background: var(--panel-solid); border-top: 1px solid var(--line);
+  }
+  @media (min-width: 600px) { .tabs { padding-bottom: 18px; } }
+  .tab {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 6px 0 2px; color: #8d82aa; text-decoration: none;
+    font-size: 11px; font-weight: 600;
+  }
+  .tab[aria-current="page"] { color: var(--text); }
+  .tab[aria-current="page"] svg { color: var(--mint); }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="stage">
+    <canvas id="map" aria-label="会場の立体マップ"></canvas>
+
+    <header class="top">
+      <label class="search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="企画・建物を検索" autocomplete="off" enterkeyhint="search">
+        <button class="clear" id="clear" type="button" aria-label="消去" hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </label>
+      <ul class="results" id="results" hidden></ul>
+    </header>
+
+    <div class="ctrl" id="ctrl">
+      <button id="compass" type="button" aria-label="向きを戻す">
+        <svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 3 15 12H9z" fill="#ff6b6b"/><path d="M12 21 9 12h6z" fill="#b4a9cf"/></svg>
+      </button>
+      <button id="locate" type="button" aria-label="現在地">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f4f0ff" stroke-width="2" stroke-linejoin="round"><path d="M20 4 4 11l7 2 2 7z"/></svg>
+      </button>
+    </div>
+
+    <section class="card off" id="card" aria-live="polite">
+      <div class="head">
+        <div class="info">
+          <p class="place" id="cPlace"></p>
+          <h2 id="cTitle"></h2>
+          <p class="desc" id="cDesc"></p>
+        </div>
+        <div class="dist"><b id="cDist"></b><span id="cTime"></span></div>
+      </div>
+      <div class="act">
+        <a class="go" id="cGo" href="ar.html">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
+          ARで案内する
+        </a>
+        <button class="close" id="cClose" type="button" aria-label="閉じる">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="list" id="list" hidden></section>
+  </main>
+
+  <nav class="tabs" aria-label="画面の切り替え">
+    <button class="tab" id="tabList" type="button">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>
+      企画
+    </button>
+    <button class="tab" id="tabMap" type="button" aria-current="page">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 3 21 8l-9 5-9-5z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg>
+      マップ
+    </button>
+    <a class="tab" id="tabAR" href="ar.html">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
+      AR
+    </a>
+  </nav>
+</div>
+
+<script type="module">
+// NAsVI マップ画面のモック。立体表示は PV（pv/pv.js の S5）と同一の投影・配色。
+const C = { bg: '#130a22', ink: '#1e0b3a', leaf: '#10b981', mint: '#5eead4', yel: '#ffd84a', lilac: '#a78bfa' };
+const JP = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+const RAD = Math.PI / 180;
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const mix = (a, b, t) => a + (b - a) * t;
+const $ = (id) => document.getElementById(id);
+// 配置先ごとの参照先（公開用リポジトリでは deploy.sh が書き換え）
+const PATHS = { data: 'data/', ar: 'ar.html' };
+
+const [bData, eData] = await Promise.all(['buildings.json', 'events.json'].map((u) => fetch(PATHS.data + u).then((r) => r.json())));
+
+// ---------- 会場データ（現在地は模擬：屋外の模擬店通路） ----------
+const U = { lat: 37.42526, lon: 138.77893 };
+const MX = 111320 * Math.cos(U.lat * RAD), MY = 110540;
+const toXY = (la, lo) => [(lo - U.lon) * MX, (la - U.lat) * MY];
+const blds = bData.buildings.map((b) => {
+  const pts = b.ring.map(([la, lo]) => toXY(la, lo));
+  let A = 0; for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length]; A += x1 * y2 - x2 * y1; }
+  return { name: b.name, pts, c: toXY(b.lat, b.lon), hgt: clamp(7 + Math.sqrt(Math.abs(A / 2)) * 0.32, 7, 30), poi: null };
+});
+const pois = eData.pois.map((p) => {
+  const b = p.building ? blds.find((x) => x.name === p.building) : null;
+  const o = { id: p.id, name: p.name, events: p.events, xy: b ? b.c : toXY(p.lat, p.lon), b };
+  if (b) b.poi = o;
+  return o;
+});
+const items = pois.flatMap((poi) => poi.events.map((ev) => ({ poi, ev })));
+
+// ---------- 経路探索（3m 格子の A*。pv.js と同一の方式） ----------
+const inPoly = (x, y, pts) => {
+  let c = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+};
+const CELL = 3, N = 130, SZ = 2 * N + 1;
+const gid = (ix, iy) => (iy + N) * SZ + (ix + N);
+const owner = new Array(SZ * SZ).fill(null);
+for (const b of blds) {
+  const xs = b.pts.map((q) => q[0]), ys = b.pts.map((q) => q[1]);
+  b.bb = [Math.min(...xs) - 3, Math.min(...ys) - 3, Math.max(...xs) + 3, Math.max(...ys) + 3];
+}
+for (let iy = -N; iy <= N; iy++) for (let ix = -N; ix <= N; ix++) {
+  const x = ix * CELL, y = iy * CELL;
+  for (const b of blds) {
+    if (x < b.bb[0] || x > b.bb[2] || y < b.bb[1] || y > b.bb[3]) continue;
+    if ([[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]].some(([ox, oy]) => inPoly(x + ox, y + oy, b.pts))) { owner[gid(ix, iy)] = b; break; }
+  }
+}
+const routeCache = new Map();
+function routeTo(poi) {
+  if (!routeCache.has(poi)) routeCache.set(poi, findRoute(poi));
+  return routeCache.get(poi);
+}
+function findRoute(poi) {
+  const solid = (k) => owner[k] !== null && owner[k] !== poi.b;
+  const gx = clamp(Math.round(poi.xy[0] / CELL), -N, N), gy = clamp(Math.round(poi.xy[1] / CELL), -N, N);
+  const g = new Float32Array(SZ * SZ).fill(Infinity), from = new Int32Array(SZ * SZ).fill(-1), heap = [];
+  const push = (f, k) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const pa = (i - 1) >> 1; if (heap[pa][0] <= heap[i][0]) break; [heap[pa], heap[i]] = [heap[i], heap[pa]]; i = pa; } };
+  const pop = () => {
+    const top = heap[0], last = heap.pop();
+    if (heap.length) { heap[0] = last; let i = 0; for (;;) { let m = i; const l = 2 * i + 1, r = l + 1; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } }
+    return top;
+  };
+  const goal = gid(gx, gy);
+  g[gid(0, 0)] = 0; push(0, gid(0, 0));
+  while (heap.length) {
+    const [, k] = pop();
+    if (k === goal) break;
+    const ix = (k % SZ) - N, iy = Math.floor(k / SZ) - N;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const nx = ix + dx, ny = iy + dy;
+      if (Math.abs(nx) > N || Math.abs(ny) > N) continue;
+      const nk = gid(nx, ny), ng = g[k] + (dx && dy ? 1.414 : 1) * (solid(nk) ? 14 : 1);
+      if (ng < g[nk]) { g[nk] = ng; from[nk] = k; push(ng + Math.hypot(gx - nx, gy - ny), nk); }
+    }
+  }
+  let cells = [];
+  for (let k = goal; k !== -1; k = from[k]) cells.push(k);
+  cells.reverse();
+  if (poi.b) { const cut = cells.findIndex((k) => owner[k] === poi.b); if (cut > 0) cells = cells.slice(0, cut); }
+  let pts = cells.map((k) => [((k % SZ) - N) * CELL, (Math.floor(k / SZ) - N) * CELL]);
+  const sight = (a, b) => {
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(d / 1.5));
+    for (let i = 0; i <= n; i++) {
+      const x = mix(a[0], b[0], i / n), y = mix(a[1], b[1], i / n);
+      if (owner[gid(clamp(Math.round(x / CELL), -N, N), clamp(Math.round(y / CELL), -N, N))]) return false;
+    }
+    return true;
+  };
+  if (pts.length > 1) {
+    const sp = [pts[0]];
+    for (let i = 0; i < pts.length - 1;) { let j = pts.length - 1; while (j > i + 1 && !sight(pts[i], pts[j])) j--; sp.push(pts[j]); i = j; }
+    pts = sp;
+    for (let it = 0; it < 3; it++) {
+      const o = [pts[0]];
+      for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1]; o.push([mix(a[0], b[0], 0.25), mix(a[1], b[1], 0.25)], [mix(a[0], b[0], 0.75), mix(a[1], b[1], 0.75)]); }
+      o.push(pts[pts.length - 1]); pts = o;
+    }
+  } else pts = [[0, 0], poi.xy];
+  let len = 0;
+  for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  return { pts, len };
+}
+
+// ---------- 画面状態 ----------
+const cv = $('map'), ctx = cv.getContext('2d');
+let W = 0, H = 0, dpr = 1;
+const TILT = 0.52, ZS = 0.9, TH0 = -0.5;
+const HOME = (() => { const b = pois.filter((p) => Math.hypot(...p.xy) < 260); return [b.reduce((a, p) => a + p.xy[0], 0) / b.length, b.reduce((a, p) => a + p.xy[1], 0) / b.length]; })();
+const view = { fx: HOME[0] + 35, fy: HOME[1] - 50, k: 1.5, th: TH0, cy: 0 };
+const goal = { ...view };
+const state = { dest: null, route: null, routeT0: 0 };
+let labelHits = [];
+
+function resize() {
+  const r = cv.getBoundingClientRect();
+  dpr = Math.min(window.devicePixelRatio || 1, 3);
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const k0 = W / 240;
+  if (!resize.done) { view.k = goal.k = k0; view.cy = goal.cy = defaultCy(); resize.done = true; }
+  else goal.cy = defaultCy();
+}
+const cardH = () => ($('card').classList.contains('off') ? 0 : $('card').offsetHeight + 12);
+const defaultCy = () => (76 + (H - cardH())) / 2;
+function placeCtrl() { $('ctrl').style.bottom = `${cardH() + 12}px`; }
+
+const cosSin = () => [Math.cos(view.th), Math.sin(view.th)];
+function project(x, y, z = 0) {
+  const [cs, sn] = cosSin();
+  const X = x - view.fx, Y = y - view.fy, rx = X * cs - Y * sn, ry = X * sn + Y * cs;
+  return [W / 2 + rx * view.k, view.cy - ry * view.k * TILT - z * view.k * ZS, ry];
+}
+function unproject(sx, sy, v = view) {
+  const cs = Math.cos(v.th), sn = Math.sin(v.th);
+  const rx = (sx - W / 2) / v.k, ry = -(sy - v.cy) / (v.k * TILT);
+  return [rx * cs + ry * sn + v.fx, -rx * sn + ry * cs + v.fy];
+}
+
+// ---------- 描画 ----------
+function draw(t) {
+  for (const key of ['fx', 'fy', 'k', 'th', 'cy']) view[key] += (goal[key] - view[key]) * 0.16;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+
+  // 地面の格子（20m 間隔）
+  ctx.strokeStyle = 'rgba(167,139,250,.09)'; ctx.lineWidth = 1;
+  const G = 440;
+  for (let v = -G; v <= G; v += 20) {
+    let [a, b] = [project(v, -G), project(v, G)]; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    [a, b] = [project(-G, v), project(G, v)]; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  }
+
+  const destB = state.dest?.poi.b;
+  const routeP = state.route ? clamp((t - state.routeT0) / 700) : 0;
+  const drawRoute = (alpha, width) => {
+    if (!state.route) return;
+    const pts = state.route.pts, n = Math.max(2, Math.ceil(pts.length * (1 - Math.pow(1 - routeP, 3))));
+    ctx.save(); ctx.globalAlpha = alpha; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = C.mint; ctx.setLineDash([0.1, width * 2.2]); ctx.lineDashOffset = -t * 0.03;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) { const [X, Y] = project(pts[i][0], pts[i][1]); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+    ctx.stroke(); ctx.restore();
+  };
+  drawRoute(1, Math.max(5, view.k * 2.4));
+
+  // 建物（奥から手前へ）
+  const list = blds.map((b) => ({ b, d: project(b.c[0], b.c[1])[2] })).sort((a, b) => b.d - a.d);
+  const lw = clamp(view.k * 0.45, 0.6, 1.3);
+  for (const { b } of list) {
+    const isDest = b === destB, isP = !!b.poi;
+    const base = b.pts.map(([x, y]) => project(x, y)), top = b.pts.map(([x, y]) => project(x, y, b.hgt));
+    b.top = top;
+    ctx.lineWidth = lw;
+    ctx.strokeStyle = isDest ? '#fff' : isP ? 'rgba(94,234,212,.85)' : 'rgba(167,139,250,.55)';
+    ctx.fillStyle = isDest ? 'rgba(200,150,0,.45)' : isP ? 'rgba(16,120,90,.4)' : 'rgba(70,30,140,.36)';
+    for (let i = 0; i < base.length; i++) {
+      const j = (i + 1) % base.length;
+      ctx.beginPath(); ctx.moveTo(base[i][0], base[i][1]); ctx.lineTo(base[j][0], base[j][1]); ctx.lineTo(top[j][0], top[j][1]); ctx.lineTo(top[i][0], top[i][1]); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.beginPath(); top.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+    ctx.fillStyle = isDest ? C.yel : isP ? C.leaf : 'rgba(60,30,120,.9)';
+    ctx.fill(); ctx.stroke();
+  }
+  drawRoute(0.4, Math.max(4, view.k * 1.8)); // 建物の背後に隠れた区間
+
+  // 屋外の企画（地面の円）
+  for (const p of pois) {
+    if (p.b) continue;
+    const [x, y] = project(p.xy[0], p.xy[1]), r = Math.max(4, view.k * 4);
+    const on = state.dest?.poi === p;
+    ctx.beginPath(); ctx.ellipse(x, y, r * 1.8, r * 1.8 * TILT, 0, 0, 7);
+    ctx.fillStyle = on ? 'rgba(255,216,74,.3)' : 'rgba(94,234,212,.18)'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y, r * 0.6, r * 0.6 * TILT, 0, 0, 7);
+    ctx.fillStyle = on ? C.yel : C.mint; ctx.fill();
+  }
+
+  // 到着地点の波紋
+  if (state.dest) {
+    const p = state.dest.poi, q = (t / 1600) % 1;
+    const [x, y] = project(p.xy[0], p.xy[1], p.b ? p.b.hgt : 0), r = 10 + q * 46;
+    ctx.strokeStyle = `rgba(255,216,74,${0.9 * (1 - q)})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * TILT, 0, 0, 7); ctx.stroke();
+  }
+
+  drawLabels();
+  drawMe(t);
+  updateCompass();
+  requestAnimationFrame(draw);
+}
+
+// 企画名の吹き出し（重なる場合は目的地を優先し、残りを省略）
+function drawLabels() {
+  labelHits = [];
+  const placed = [];
+  const order = [...pois].sort((a, b) => (b === state.dest?.poi) - (a === state.dest?.poi) || project(b.xy[0], b.xy[1])[2] - project(a.xy[0], a.xy[1])[2]);
+  ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  for (const p of order) {
+    const isDest = p === state.dest?.poi;
+    if (!isDest && view.k < 1.25) continue;
+    const ev = isDest ? state.dest.ev : p.events[0];
+    const more = !isDest && p.events.length > 1 ? ` +${p.events.length - 1}` : '';
+    const label = ev.title + more;
+    ctx.font = `700 ${isDest ? 13 : 11}px ${JP}`;
+    const tw = ctx.measureText(label).width + (isDest ? 20 : 14), th = isDest ? 26 : 22;
+    const [x, y] = project(p.xy[0], p.xy[1], p.b ? p.b.hgt : 0), stem = isDest ? 22 : 14;
+    const r = { x: x - tw / 2, y: y - stem - th, w: tw, h: th };
+    if (r.x < 4 || r.x + r.w > W - 4 || r.y < 70 || y > H) { if (!isDest) continue; }
+    if (placed.some((o) => r.x < o.x + o.w + 4 && r.x + r.w + 4 > o.x && r.y < o.y + o.h + 3 && r.y + r.h + 3 > o.y)) continue;
+    placed.push(r); labelHits.push({ r, p });
+    ctx.strokeStyle = isDest ? C.yel : 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - stem); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 6);
+    ctx.fillStyle = isDest ? C.yel : 'rgba(244,240,255,.94)'; ctx.fill();
+    ctx.fillStyle = C.ink; ctx.fillText(label, x, r.y + r.h / 2 + 0.5);
+  }
+  ctx.restore();
+}
+
+// 現在地（向きつき矢印と脈動する輪）
+function drawMe(t) {
+  const [x, y] = project(0, 0), q = (t / 1400) % 1;
+  ctx.strokeStyle = `rgba(255,255,255,${0.7 * (1 - q)})`; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(x, y, 8 + q * 34, (8 + q * 34) * TILT, 0, 0, 7); ctx.stroke();
+  let ang = -Math.PI / 2;
+  const r = state.route;
+  if (r && r.pts.length > 1) {
+    const a = r.pts.find((p) => Math.hypot(p[0], p[1]) > 4) || r.pts[1];
+    const [ax, ay] = project(a[0], a[1]); ang = Math.atan2(ay - y, ax - x);
+  }
+  ctx.save(); ctx.translate(x, y - 4); ctx.rotate(ang + Math.PI / 2);
+  ctx.beginPath(); ctx.moveTo(0, -13); ctx.lineTo(9, 8); ctx.lineTo(0, 3.5); ctx.lineTo(-9, 8); ctx.closePath();
+  ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+}
+
+function updateCompass() {
+  const [x0, y0] = project(view.fx, view.fy), [x1, y1] = project(view.fx, view.fy + 10);
+  $('compass').firstElementChild.style.transform = `rotate(${Math.atan2(x1 - x0, -(y1 - y0))}rad)`;
+}
+
+// ---------- 目的地の選択 ----------
+function select(poi, ev) {
+  state.dest = { poi, ev }; state.route = routeTo(poi); state.routeT0 = performance.now();
+  $('q').value = ev.title; $('clear').hidden = false; $('results').hidden = true; $('q').blur();
+  $('cPlace').textContent = poi.name;
+  $('cTitle').textContent = ev.title;
+  $('cDesc').textContent = [ev.desc, ev.time].filter(Boolean).join('　');
+  $('cDesc').hidden = !$('cDesc').textContent;
+  const m = Math.round(state.route.len / 5) * 5;
+  $('cDist').innerHTML = `${m}<small>m</small>`;
+  $('cTime').textContent = `徒歩 ${Math.max(1, Math.round(state.route.len / 75))} 分`;
+  $('card').classList.remove('off');
+  setArLinks();
+  showTab('map');
+  requestAnimationFrame(() => { placeCtrl(); fitRoute(); });
+}
+function clearDest() {
+  state.dest = null; state.route = null;
+  $('card').classList.add('off'); $('q').value = ''; $('clear').hidden = true;
+  setArLinks();
+  placeCtrl(); goal.cy = defaultCy();
+}
+// 経路の全体が検索窓とカードの間に収まる縮尺へ移動
+function fitRoute() {
+  const pts = [...state.route.pts, state.dest.poi.xy];
+  const cs = Math.cos(goal.th), sn = Math.sin(goal.th);
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y] of pts) { const rx = x * cs - y * sn, ry = x * sn + y * cs; x0 = Math.min(x0, rx); x1 = Math.max(x1, rx); y0 = Math.min(y0, ry); y1 = Math.max(y1, ry); }
+  const top = 130, bottom = H - cardH() - 30, h = bottom - top;
+  const k = clamp(Math.min((W - 72) / Math.max(x1 - x0, 1), h / Math.max((y1 - y0) * TILT + 30 * ZS, 1)), 1.1, 3.2);
+  const rx = (x0 + x1) / 2, ry = (y0 + y1) / 2;
+  goal.fx = rx * cs + ry * sn; goal.fy = -rx * sn + ry * cs; goal.k = k;
+  goal.cy = (top + bottom) / 2 + 10;
+}
+
+// AR ガイドへ目的地を引き渡す（?dest=<企画場所の id>&ev=<その場所での企画の番号>）
+function setArLinks() {
+  const d = state.dest;
+  const url = d ? `${PATHS.ar}?dest=${encodeURIComponent(d.poi.id)}&ev=${d.poi.events.indexOf(d.ev)}` : PATHS.ar;
+  $('cGo').href = url; $('tabAR').href = url;
+}
+setArLinks();
+
+// ---------- 検索 ----------
+const norm = (s) => s.toLowerCase().normalize('NFKC');
+const distOf = (poi) => Math.round(routeTo(poi).len / 5) * 5;
+function rowHTML({ poi, ev }, i, inList = false) {
+  const sub = [inList ? '' : poi.name, ev.desc, ev.time].filter(Boolean).join(' ・ ');
+  return `<li><button class="row" data-i="${i}" type="button"><i class="dot${poi.b ? '' : ' out'}"></i><span><span class="t">${ev.title}</span>${sub ? `<span class="s">${sub}</span>` : ''}</span><span class="m">${distOf(poi)} m</span></button></li>`;
+}
+function renderResults() {
+  const q = norm($('q').value.trim());
+  $('clear').hidden = !$('q').value;
+  const hits = items.map((it, i) => ({ it, i })).filter(({ it }) => !q || norm(`${it.ev.title} ${it.poi.name} ${it.ev.desc || ''}`).includes(q));
+  $('results').innerHTML = hits.length ? hits.slice(0, 30).map(({ it, i }) => rowHTML(it, i)).join('') : '<li class="empty">該当する企画がありません</li>';
+  $('results').hidden = false;
+}
+$('q').addEventListener('focus', renderResults);
+$('q').addEventListener('input', renderResults);
+$('clear').addEventListener('click', () => { clearDest(); $('q').focus(); });
+document.addEventListener('click', (e) => {
+  const row = e.target.closest('.row');
+  if (row) { const it = items[+row.dataset.i]; select(it.poi, it.ev); return; }
+  if (!e.target.closest('.top')) $('results').hidden = true;
+});
+$('cClose').addEventListener('click', clearDest);
+
+// ---------- 企画一覧（左タブ） ----------
+$('list').innerHTML = pois.map((poi) => `<h3>${poi.name}</h3><ul>${poi.events.map((ev) => rowHTML({ poi, ev }, items.findIndex((x) => x.ev === ev), true)).join('')}</ul>`).join('');
+function showTab(name) {
+  $('list').hidden = name !== 'list';
+  $('tabList').toggleAttribute('aria-current', name === 'list');
+  $('tabMap').toggleAttribute('aria-current', name === 'map');
+  if (name === 'list') $('tabList').setAttribute('aria-current', 'page');
+  if (name === 'map') $('tabMap').setAttribute('aria-current', 'page');
+}
+$('tabList').addEventListener('click', () => showTab('list'));
+$('tabMap').addEventListener('click', () => showTab('map'));
+
+// ---------- 地図の操作（1本指: 移動 / 2本指: 拡大・回転 / ホイール: 拡大 / Shift+ドラッグ: 回転） ----------
+const ptrs = new Map();
+let gesture = null;
+function snap() { Object.assign(view, goal); }
+function zoomAt(sx, sy, f) {
+  const [wx, wy] = unproject(sx, sy, goal);
+  goal.k = clamp(goal.k * f, 0.9, 7);
+  const [nx, ny] = unproject(sx, sy, goal);
+  goal.fx += wx - nx; goal.fy += wy - ny;
+}
+cv.addEventListener('pointerdown', (e) => {
+  cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  gesture = { moved: false, sx: e.offsetX, sy: e.offsetY, rotate: e.shiftKey || e.button === 2 };
+  $('results').hidden = true; $('q').blur();
+});
+cv.addEventListener('pointermove', (e) => {
+  const prev = ptrs.get(e.pointerId);
+  if (!prev) return;
+  const cur = { x: e.offsetX, y: e.offsetY };
+  if (Math.hypot(cur.x - gesture.sx, cur.y - gesture.sy) > 6) gesture.moved = true;
+  if (ptrs.size === 1) {
+    snap();
+    if (gesture.rotate) goal.th += (cur.x - prev.x) * 0.008;
+    else {
+      const [ax, ay] = unproject(prev.x, prev.y, goal), [bx, by] = unproject(cur.x, cur.y, goal);
+      goal.fx -= bx - ax; goal.fy -= by - ay;
+    }
+  } else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    const other = a === prev ? b : a;
+    const d0 = Math.hypot(prev.x - other.x, prev.y - other.y), d1 = Math.hypot(cur.x - other.x, cur.y - other.y);
+    const a0 = Math.atan2(prev.y - other.y, prev.x - other.x), a1 = Math.atan2(cur.y - other.y, cur.x - other.x);
+    snap();
+    zoomAt((cur.x + other.x) / 2, (cur.y + other.y) / 2, d1 / Math.max(d0, 1));
+    goal.th += a1 - a0;
+  }
+  ptrs.set(e.pointerId, cur);
+});
+const endPtr = (e) => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (ptrs.size === 0 && gesture && !gesture.moved) tap(e.offsetX, e.offsetY);
+  if (ptrs.size) gesture.moved = true;
+};
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+cv.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0018)); }, { passive: false });
+
+// タップした企画（吹き出し → 建物の屋上 → 屋外の円の順に判定）
+function tap(x, y) {
+  const lab = labelHits.find(({ r }) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+  if (lab) return select(lab.p, lab.p.events[0]);
+  const front = blds.filter((b) => b.top).map((b) => ({ b, d: project(b.c[0], b.c[1])[2] })).sort((a, b) => a.d - b.d);
+  for (const { b } of front) {
+    const path = new Path2D(); b.top.forEach(([px, py], i) => (i ? path.lineTo(px, py) : path.moveTo(px, py))); path.closePath();
+    if (ctx.isPointInPath(path, x * dpr, y * dpr)) { if (b.poi) select(b.poi, b.poi.events[0]); return; }
+  }
+  for (const p of pois) {
+    if (p.b) continue;
+    const [px, py] = project(p.xy[0], p.xy[1]);
+    if (Math.hypot(px - x, (py - y) / TILT) < 22) return select(p, p.events[0]);
+  }
+}
+
+$('compass').addEventListener('click', () => { goal.th = TH0; });
+$('locate').addEventListener('click', () => { goal.fx = 0; goal.fy = 0; goal.k = W / 180; goal.th = TH0; goal.cy = defaultCy(); });
+
+addEventListener('resize', () => { resize(); placeCtrl(); });
+resize(); placeCtrl();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
