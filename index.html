@@ -588,8 +588,12 @@ cv.addEventListener('pointermove', (e) => {
     const d0 = Math.hypot(prev.x - other.x, prev.y - other.y), d1 = Math.hypot(cur.x - other.x, cur.y - other.y);
     const a0 = Math.atan2(prev.y - other.y, prev.x - other.x), a1 = Math.atan2(cur.y - other.y, cur.x - other.x);
     snap();
-    zoomAt((cur.x + other.x) / 2, (cur.y + other.y) / 2, d1 / Math.max(d0, 1));
-    goal.th += a1 - a0;
+    // 2本指の中点の下にある地点を、移動後の中点へ固定（拡大・回転・平行移動を同時に処理）
+    const [wx, wy] = unproject((prev.x + other.x) / 2, (prev.y + other.y) / 2, goal);
+    goal.k = clamp(goal.k * (d1 / Math.max(d0, 1)), 0.9, 7);
+    goal.th -= a1 - a0; // 画面上の指の回転と地図の回転を同じ向きにする
+    const [nx, ny] = unproject((cur.x + other.x) / 2, (cur.y + other.y) / 2, goal);
+    goal.fx += wx - nx; goal.fy += wy - ny;
   }
   ptrs.set(e.pointerId, cur);
 });
